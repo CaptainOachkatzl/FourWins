@@ -2,10 +2,10 @@ use crate::coordinate_translation::*;
 use crate::field::*;
 use crate::field_renderer;
 use crate::fill::*;
+use crate::player_input::*;
+use bevy::core::FixedTimestep;
 use bevy::prelude::*;
 use bevy_prototype_debug_lines::DebugLines;
-use bevy::core::FixedTimestep;
-use crate::player_input::*;
 
 pub struct FourWinsPlugin;
 
@@ -45,7 +45,11 @@ impl Plugin for FourWinsPlugin {
                 position: 0,
                 index: 0,
             })
-            .insert_resource(PlayerInput::new(Box::new([ KeyCode::Space, KeyCode::Left, KeyCode::Right ])))
+            .insert_resource(PlayerInput::new(Box::new([
+                KeyCode::Space,
+                KeyCode::Left,
+                KeyCode::Right,
+            ])))
             .add_startup_system(initialize.system())
             .add_system_set(
                 SystemSet::new()
@@ -64,7 +68,13 @@ pub fn initialize(
     coordinate_translation: Res<CoordinateTranslation>,
 ) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-    create_player_chip(commands, asset_server, materials, &player_data, &coordinate_translation);
+    create_player_chip(
+        commands,
+        asset_server,
+        materials,
+        &player_data,
+        &coordinate_translation,
+    );
 }
 
 pub fn update_player_actions(
@@ -76,11 +86,15 @@ pub fn update_player_actions(
     mut field: ResMut<Field>,
     mut player_data: ResMut<PlayerData>,
     coordinate_translation: Res<CoordinateTranslation>,
-    mut query: Query<(Entity, &mut Transform, &mut PlayerControlled, With<PlayerControlled>)>
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &mut PlayerControlled,
+        With<PlayerControlled>,
+    )>,
 ) {
     let winner: i32 = field.get_winner();
-    if winner >= 0
-    {
+    if winner >= 0 {
         return;
     }
 
@@ -99,40 +113,44 @@ pub fn update_player_actions(
 
     let mut drop = false;
     if player_input.just_pressed(KeyCode::Space) {
-        
         drop = true;
     }
 
     for (_, mut transform, mut player_controlled, _) in query.iter_mut() {
-        
         if player_controlled.0 {
-
-            transform.translation.x = coordinate_translation.horizontal_center_to_pixel(player_data.position);
+            transform.translation.x =
+                coordinate_translation.horizontal_center_to_pixel(player_data.position);
 
             if drop {
-                let y = field.insert(player_data.position, match player_data.index {
-                    0 => Fill::Player1,
-                    _ => Fill::Player2,
-                });
+                let y = field.insert(
+                    player_data.position,
+                    match player_data.index {
+                        0 => Fill::Player1,
+                        _ => Fill::Player2,
+                    },
+                );
 
                 if y >= 0 {
-                    
                     player_controlled.0 = false;
-                    
-                    transform.translation.y = coordinate_translation.vertical_center_to_pixel(y as usize);
+
+                    transform.translation.y =
+                        coordinate_translation.vertical_center_to_pixel(y as usize);
                     let winner: i32 = field.get_winner();
-                    if winner >= 0
-                    {
+                    if winner >= 0 {
                         println!("player {} won!", winner);
                         return;
                     }
 
-
                     player_data.index = (player_data.index + 1) % 2;
-                    create_player_chip(commands, asset_server, materials, &player_data, &coordinate_translation);
-                }             
+                    create_player_chip(
+                        commands,
+                        asset_server,
+                        materials,
+                        &player_data,
+                        &coordinate_translation,
+                    );
+                }
             }
-            
             return;
         }
     }
@@ -158,14 +176,15 @@ pub fn create_player_chip(
         -FIELD_WIDTH / 2. + coordinate_translation.horizontal_center_to_pixel(player_data.position);
     let player_pixel_pos = Vec3::new(player_x, CHIP_START_Y, 10.);
 
-    commands.spawn_bundle(SpriteBundle {
-        material: materials.add(asset_server.load(asset_string).into()),
-        sprite: Sprite::new(Vec2::new(40., 40.)),
-        transform: Transform {
-            translation: player_pixel_pos,
+    commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(asset_server.load(asset_string).into()),
+            sprite: Sprite::new(Vec2::new(40., 40.)),
+            transform: Transform {
+                translation: player_pixel_pos,
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        ..Default::default()
-    })
-    .insert(PlayerControlled(true));
+        })
+        .insert(PlayerControlled(true));
 }
