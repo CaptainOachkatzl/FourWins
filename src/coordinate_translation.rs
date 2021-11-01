@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Clone, Copy)]
 pub struct CoordinateTranslation {
     width_coordinates: usize,

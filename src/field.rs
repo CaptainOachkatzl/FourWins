@@ -58,8 +58,8 @@ impl Field {
     }
 
     pub fn get_winner(&self) -> i32 {
-        for y in 0..self.height - WIN_COUNT {
-            for x in 0..self.width - WIN_COUNT {
+        for y in 0..=self.height - WIN_COUNT {
+            for x in 0..=self.width - WIN_COUNT {
                 let fill = self.find_winner_at_block(x, y);
                 if fill != Fill::Empty {
                     return fill_enum_to_player_index(fill);
