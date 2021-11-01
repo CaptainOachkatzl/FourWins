@@ -103,10 +103,10 @@ pub fn update_player_actions(
         drop = true;
     }
 
-    for (chip, mut transform, mut player_controlled, _) in query.iter_mut() {
+    for (_, mut transform, mut player_controlled, _) in query.iter_mut() {
         
         if player_controlled.0 {
-            
+
             transform.translation.x = coordinate_translation.horizontal_center_to_pixel(player_data.position);
 
             if drop {
@@ -168,9 +168,4 @@ pub fn create_player_chip(
         ..Default::default()
     })
     .insert(PlayerControlled(true));
-
-    println!(
-        "{} - {} - {}",
-        player_pixel_pos.x, player_pixel_pos.y, player_pixel_pos.z
-    );
 }
