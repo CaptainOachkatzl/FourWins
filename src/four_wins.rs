@@ -172,8 +172,7 @@ pub fn create_player_chip(
         _ => PLAYER2_CHIP,
     };
 
-    let player_x =
-        -FIELD_WIDTH / 2. + coordinate_translation.horizontal_center_to_pixel(player_data.position);
+    let player_x = coordinate_translation.horizontal_center_to_pixel(player_data.position);
     let player_pixel_pos = Vec3::new(player_x, CHIP_START_Y, 10.);
 
     commands
