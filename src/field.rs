@@ -82,9 +82,14 @@ impl Field {
             return fill;
         }
 
-        if self.find_winner_diagonally(fill, x, y) {
+        if self.find_winner_diagonally_upwards(fill, x, y) {
             return fill;
         }
+
+        if self.find_winner_diagonally_downwards(fill, x, y) {
+            return fill;
+        }
+
         return Fill::Empty;
     }
 
@@ -108,9 +113,23 @@ impl Field {
         return true;
     }
 
-    fn find_winner_diagonally(&self, fill: Fill, x: usize, y: usize) -> bool {
+    fn find_winner_diagonally_upwards(&self, fill: Fill, x: usize, y: usize) -> bool {
         for i in 1..WIN_COUNT {
             if self.get_fill(x + i, y + i) != fill {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    fn find_winner_diagonally_downwards(&self, fill: Fill, x: usize, y: usize) -> bool {
+        for i in 1..WIN_COUNT {
+            if i > y {
+                return false;
+            }
+
+            if self.get_fill(x + i, y - i) != fill {
                 return false;
             }
         }
