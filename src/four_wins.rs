@@ -3,6 +3,7 @@ use crate::field::*;
 use crate::field_renderer;
 use crate::fill::*;
 use crate::player_input::*;
+use std::cell::RefCell;
 use bevy::core::FixedTimestep;
 use bevy::prelude::*;
 use bevy_prototype_debug_lines::DebugLines;
@@ -15,6 +16,10 @@ const PLAYER2_CHIP: &str = "player2.png";
 pub struct PlayerData {
     pub position: usize,
     pub index: i32,
+}
+
+pub struct GameState {
+    pub victorious_player_index: i32,
 }
 
 pub struct PlayerControlled(bool);
@@ -32,31 +37,34 @@ const CHIP_START_Y: f32 = FIELD_HEIGHT / 2. + 50.;
 impl Plugin for FourWinsPlugin {
     fn build(&self, app: &mut AppBuilder) {
         // add things to your app here
-        app.insert_resource(Field::new(FIELD_BLOCKS_HORIZONTAL, FIELD_BLOCKS_VERTICAL))
-            .insert_resource(CoordinateTranslation::new(
-                FIELD_BLOCKS_HORIZONTAL,
-                FIELD_BLOCKS_VERTICAL,
-                FIELD_WIDTH,
-                FIELD_HEIGHT,
-                -FIELD_WIDTH / 2.,
-                -FIELD_HEIGHT / 2.,
-            ))
-            .insert_resource(PlayerData {
-                position: 0,
-                index: 0,
-            })
-            .insert_resource(PlayerInput::new(Box::new([
-                KeyCode::Space,
-                KeyCode::Left,
-                KeyCode::Right,
-            ])))
-            .add_startup_system(initialize.system())
-            .add_system_set(
-                SystemSet::new()
-                    .with_run_criteria(FixedTimestep::step(FRAME_TIME))
-                    .with_system(update_player_actions.system()),
-            )
-            .add_system(render.system());
+        app.insert_resource(GameState {
+            victorious_player_index: -1,
+        })
+        .insert_resource(Field::new(FIELD_BLOCKS_HORIZONTAL, FIELD_BLOCKS_VERTICAL))
+        .insert_resource(CoordinateTranslation::new(
+            FIELD_BLOCKS_HORIZONTAL,
+            FIELD_BLOCKS_VERTICAL,
+            FIELD_WIDTH,
+            FIELD_HEIGHT,
+            -FIELD_WIDTH / 2.,
+            -FIELD_HEIGHT / 2.,
+        ))
+        .insert_resource(PlayerData {
+            position: 0,
+            index: 0,
+        })
+        .insert_resource(PlayerInput::new(Box::new([
+            KeyCode::Space,
+            KeyCode::Left,
+            KeyCode::Right,
+        ])))
+        .add_startup_system(initialize.system())
+        .add_system_set(
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(FRAME_TIME))
+                .with_system(update_player_actions.system()),
+        )
+        .add_system(render.system());
     }
 }
 
@@ -69,9 +77,9 @@ pub fn initialize(
 ) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     create_player_chip(
-        commands,
-        asset_server,
-        materials,
+        &RefCell::from(commands),
+        &asset_server,
+        &RefCell::from(materials),
         &player_data,
         &coordinate_translation,
     );
@@ -82,6 +90,7 @@ pub fn update_player_actions(
     asset_server: Res<AssetServer>,
     materials: ResMut<Assets<ColorMaterial>>,
     keyboard_input: Res<Input<KeyCode>>,
+    mut game_state: ResMut<GameState>,
     mut player_input: ResMut<PlayerInput>,
     mut field: ResMut<Field>,
     mut player_data: ResMut<PlayerData>,
@@ -93,12 +102,27 @@ pub fn update_player_actions(
         With<PlayerControlled>,
     )>,
 ) {
-    let winner: i32 = field.get_winner();
-    if winner >= 0 {
-        return;
+    player_input.update(keyboard_input);
+
+    let mut drop = false;
+    if player_input.just_pressed(KeyCode::Space) {
+        drop = true;
     }
 
-    player_input.update(keyboard_input);
+    let rc_commands = RefCell::from(commands);
+    let rc_materials = RefCell::from(materials);
+    if game_state.victorious_player_index >= 0 {
+        if drop {
+            field.reset();
+            for (entity, _, _, _) in query.iter_mut() {
+                rc_commands.borrow_mut().entity(entity).despawn();
+            }
+            create_player_chip(&rc_commands, &asset_server, &rc_materials, &mut player_data, &coordinate_translation);
+            game_state.victorious_player_index = -1;
+        }
+
+        return;
+    }
 
     if player_input.just_pressed(KeyCode::Left) {
         if player_data.position > 0 {
@@ -109,11 +133,6 @@ pub fn update_player_actions(
         if player_data.position < FIELD_BLOCKS_HORIZONTAL - 1 {
             player_data.position += 1;
         }
-    }
-
-    let mut drop = false;
-    if player_input.just_pressed(KeyCode::Space) {
-        drop = true;
     }
 
     for (_, mut transform, mut player_controlled, _) in query.iter_mut() {
@@ -135,17 +154,17 @@ pub fn update_player_actions(
 
                     transform.translation.y =
                         coordinate_translation.vertical_center_to_pixel(y as usize);
-                    let winner: i32 = field.get_winner();
-                    if winner >= 0 {
-                        println!("player {} won!", winner);
+                    game_state.victorious_player_index = field.get_winner();
+                    if game_state.victorious_player_index >= 0 {
+                        println!("player {} won!", game_state.victorious_player_index);
                         return;
                     }
 
                     player_data.index = (player_data.index + 1) % 2;
                     create_player_chip(
-                        commands,
-                        asset_server,
-                        materials,
+                        &rc_commands,
+                        &asset_server,
+                        &rc_materials,
                         &player_data,
                         &coordinate_translation,
                     );
@@ -161,9 +180,9 @@ pub fn render(field: Res<Field>, lines: ResMut<DebugLines>) {
 }
 
 pub fn create_player_chip(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    commands: &RefCell::<Commands>,
+    asset_server: &AssetServer,
+    materials: &RefCell::<ResMut<Assets<ColorMaterial>>>,
     player_data: &PlayerData,
     coordinate_translation: &CoordinateTranslation,
 ) {
@@ -175,9 +194,9 @@ pub fn create_player_chip(
     let player_x = coordinate_translation.horizontal_center_to_pixel(player_data.position);
     let player_pixel_pos = Vec3::new(player_x, CHIP_START_Y, 10.);
 
-    commands
+    commands.borrow_mut()
         .spawn_bundle(SpriteBundle {
-            material: materials.add(asset_server.load(asset_string).into()),
+            material: materials.borrow_mut().add(asset_server.load(asset_string).into()),
             sprite: Sprite::new(Vec2::new(40., 40.)),
             transform: Transform {
                 translation: player_pixel_pos,

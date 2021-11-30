@@ -18,6 +18,12 @@ impl Field {
         };
     }
 
+    pub fn reset(&mut self) {
+        for i in 0..self.state.len() {
+            self.state[i] = Fill::Empty;
+        }
+    }
+
     pub fn get_fill(&self, x: usize, y: usize) -> Fill {
         if self.is_out_of_bounds(x, y) {
             return Fill::OutOfBounds;
