@@ -71,15 +71,15 @@ impl Plugin for FourWinsPlugin {
 pub fn initialize(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    materials: ResMut<Assets<ColorMaterial>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
     player_data: Res<PlayerData>,
     coordinate_translation: Res<CoordinateTranslation>,
 ) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     create_player_chip(
-        &RefCell::from(commands),
+        &mut commands,
         &asset_server,
-        &RefCell::from(materials),
+        &mut materials,
         &player_data,
         &coordinate_translation,
     );
@@ -117,7 +117,14 @@ pub fn update_player_actions(
             for (entity, _, _, _) in query.iter_mut() {
                 rc_commands.borrow_mut().entity(entity).despawn();
             }
-            create_player_chip(&rc_commands, &asset_server, &rc_materials, &mut player_data, &coordinate_translation);
+            
+            create_player_chip(
+                &mut rc_commands.borrow_mut(), 
+                &asset_server, 
+                &mut rc_materials.borrow_mut(), 
+                &mut player_data, 
+                &coordinate_translation);
+
             game_state.victorious_player_index = -1;
         }
 
@@ -162,9 +169,9 @@ pub fn update_player_actions(
 
                     player_data.index = (player_data.index + 1) % 2;
                     create_player_chip(
-                        &rc_commands,
+                        &mut rc_commands.borrow_mut(),
                         &asset_server,
-                        &rc_materials,
+                        &mut rc_materials.borrow_mut(),
                         &player_data,
                         &coordinate_translation,
                     );
@@ -180,9 +187,9 @@ pub fn render(field: Res<Field>, lines: ResMut<DebugLines>) {
 }
 
 pub fn create_player_chip(
-    commands: &RefCell::<Commands>,
+    commands: &mut Commands,
     asset_server: &AssetServer,
-    materials: &RefCell::<ResMut<Assets<ColorMaterial>>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
     player_data: &PlayerData,
     coordinate_translation: &CoordinateTranslation,
 ) {
@@ -194,9 +201,9 @@ pub fn create_player_chip(
     let player_x = coordinate_translation.horizontal_center_to_pixel(player_data.position);
     let player_pixel_pos = Vec3::new(player_x, CHIP_START_Y, 10.);
 
-    commands.borrow_mut()
+    commands
         .spawn_bundle(SpriteBundle {
-            material: materials.borrow_mut().add(asset_server.load(asset_string).into()),
+            material: materials.add(asset_server.load(asset_string).into()),
             sprite: Sprite::new(Vec2::new(40., 40.)),
             transform: Transform {
                 translation: player_pixel_pos,
